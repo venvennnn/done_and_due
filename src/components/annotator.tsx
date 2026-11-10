@@ -13,7 +13,6 @@ export function PhotoAnnotator({
   placingLineId,
   onSelectLine,
   onPlace,
-  labelled = true,
 }: {
   photo: JobPhoto;
   lines: InvoiceLine[];
@@ -21,7 +20,6 @@ export function PhotoAnnotator({
   placingLineId?: string | null;
   onSelectLine?: (lineId: string) => void;
   onPlace?: (box: Box2D) => void;
-  labelled?: boolean;
 }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -76,40 +74,18 @@ export function PhotoAnnotator({
           viewBox={`0 0 ${photo.width} ${photo.height}`}
           onPointerDown={placeFromEvent}
           role="img"
-          aria-label={regions.length ? regions.map((line) => `Marker ${lineNumber(lines, line.id)} circles ${line.photoRegion?.label}`).join(". ") : "Job photo"}
+          aria-label={regions.length ? `Job photo. Click an object to circle it. ${regions.map((line) => line.photoRegion?.label).join(", ")}.` : "Job photo"}
         >
-          <defs>
-            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
-              <path d="M0,0 L7,3 L0,6 Z" fill="#1258F5" />
-            </marker>
-          </defs>
           {regions.map((line) => {
             const region = line.photoRegion!;
             const rect = sourceRect(region.box2d, photo.width, photo.height);
-            const ellipse = paddedEllipse(rect, 0.1);
-            const cx = rect.x + rect.width / 2;
-            const cy = rect.y + rect.height / 2;
-            const number = lineNumber(lines, line.id);
-            const label = `${number} · ${region.label}`;
-            const labelWidth = Math.min(photo.width * 0.46, 18 + label.length * (photo.width / 55));
-            const labelHeight = photo.height * 0.07;
-            let labelX = rect.x - labelWidth * 0.15;
-            let labelY = Math.max(8, rect.y - labelHeight - photo.height * 0.03);
-            labelX = Math.max(8, Math.min(labelX, photo.width - labelWidth - 8));
-            labelY = Math.max(8, Math.min(labelY, photo.height - labelHeight - 8));
+            const ellipse = paddedEllipse(rect, 0.08);
             const active = line.id === activeLineId;
+            const number = lineNumber(lines, line.id);
             return (
-              <g key={line.id} className="cursor-pointer" onPointerDown={(event) => { event.stopPropagation(); onSelectLine?.(line.id); }} tabIndex={0} role="button" aria-label={`Show invoice line ${number}, ${region.label}`} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") onSelectLine?.(line.id); }}>
-                <ellipse cx={ellipse.x + ellipse.width / 2} cy={ellipse.y + ellipse.height / 2} rx={ellipse.width / 2} ry={ellipse.height / 2} fill="none" stroke={active ? "#0E4AD4" : "#1258F5"} strokeWidth={Math.max(photo.width, photo.height) / 180} />
-                {labelled ? (
-                  <>
-                    <line x1={labelX + labelWidth * 0.72} y1={labelY + labelHeight} x2={cx} y2={cy} stroke="#1258F5" strokeWidth={Math.max(photo.width, photo.height) / 280} markerEnd="url(#arrowhead)" />
-                    <rect x={labelX} y={labelY} width={labelWidth} height={labelHeight} rx={labelHeight / 2} fill="#1258F5" />
-                    <text x={labelX + labelWidth / 2} y={labelY + labelHeight * 0.66} textAnchor="middle" fill="white" fontSize={labelHeight * 0.42} fontFamily="Plus Jakarta Sans, sans-serif" fontWeight={700}>
-                      {label}
-                    </text>
-                  </>
-                ) : null}
+              <g key={line.id} className="cursor-pointer outline-none" style={{ outline: "none" }} onPointerDown={(event) => { event.stopPropagation(); onSelectLine?.(line.id); }} tabIndex={0} role="button" aria-label={`Circle ${region.label}`} aria-pressed={active} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectLine?.(line.id); } }}>
+                <ellipse cx={ellipse.x + ellipse.width / 2} cy={ellipse.y + ellipse.height / 2} rx={ellipse.width / 2} ry={ellipse.height / 2} fill="transparent" stroke={active ? "#1258F5" : "transparent"} strokeWidth={active ? Math.max(photo.width, photo.height) / 140 : 0} />
+                <title>{`${number} ${region.label}`}</title>
               </g>
             );
           })}

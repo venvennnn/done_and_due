@@ -57,7 +57,7 @@ npm run build
 
 1. Open `/demo`.
 2. Choose **Load sample job** for Emma Wilson, the kitchen tap photo, and the sample transcript.
-3. Create the draft. The sample bills a mixer tap at $40 and one hour of plumbing at $60. Connectors stay under Not billed.
+3. Create the draft. The sample bills a mixer tap at $40 and one hour of plumbing at $60. Connectors, the plant, and the soap dispenser stay under Not billed. Click the plant, tap, or soap dispenser on the photo to circle that object.
 4. Change labor to 1.5 hours. The total becomes $130 and survives reload in this browser.
 5. Approve, simulate sending, open the demo buyer preview, then simulate pending, partial, and paid.
 6. **Reset demo** clears only the demo workspace.
