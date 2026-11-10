@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+eval/output
+.env
+.env.local
+*.md
+design
+tests
+coverage
