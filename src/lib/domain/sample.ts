@@ -17,6 +17,13 @@ export const SAMPLE_PHOTO = {
   label: "Standard mixer tap",
 };
 
+/** Visible parts on kitchen-tap.jpg. Only the tap is billed. [yMin, xMin, yMax, xMax]. */
+export const SAMPLE_OBJECTS = [
+  { label: "Potted herb", box2d: [250, 10, 860, 320] as [number, number, number, number], billed: false },
+  { label: "Standard mixer tap", box2d: [100, 430, 780, 810] as [number, number, number, number], billed: true },
+  { label: "Soap dispenser", box2d: [300, 770, 690, 940] as [number, number, number, number], billed: false },
+] as const;
+
 export const SAMPLE_CUSTOMER = {
   name: "Emma Wilson",
   demoEmail: "emma.wilson@example.com",

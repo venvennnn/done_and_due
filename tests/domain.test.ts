@@ -87,6 +87,8 @@ describe("sample draft", () => {
     expect(tap?.photoRegion?.box2d).toEqual([100, 430, 780, 810]);
     expect(labor?.rateMinor).toBe(6000);
     expect(labor?.photoRegion).toBeNull();
+    expect(drafted.lines.filter((line) => line.photoRegion).map((line) => line.photoRegion?.label)).toEqual(["Standard mixer tap", "Potted herb", "Soap dispenser"]);
+    expect(drafted.lines.filter((line) => line.description === "Potted herb" || line.description === "Soap dispenser").every((line) => line.excluded)).toBe(true);
     expect(labor?.transcriptQuote?.toLowerCase()).toContain("one hour of labor");
     expect(drafted.exclusions[0]?.description.toLowerCase()).toContain("connector");
     const flags = reviewFlags({

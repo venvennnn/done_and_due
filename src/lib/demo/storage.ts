@@ -1,7 +1,7 @@
 import type { DemoState } from "@/lib/demo/seed";
 import { createDemoState } from "@/lib/demo/seed";
 
-const KEY = "done-and-due.demo.v1";
+const KEY = "done-and-due.demo.v3";
 const DB = "done-and-due-demo";
 
 function database(): Promise<IDBDatabase> {

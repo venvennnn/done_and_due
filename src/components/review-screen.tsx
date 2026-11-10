@@ -188,7 +188,8 @@ function EvidenceColumn({
         </div>
         {job?.photo?.url ? (
           <div id={`${idPrefix}evidence-photo`}>
-            <PhotoAnnotator photo={job.photo} lines={invoice.lines} activeLineId={focus?.lineId} placingLineId={placing} onSelectLine={onSelectLine} onPlace={onPlace} />
+            <PhotoAnnotator photo={job.photo} lines={invoice.lines} activeLineId={focus?.kind === "photo" ? focus.lineId : null} placingLineId={placing} onSelectLine={onSelectLine} onPlace={onPlace} />
+            <p className="mt-2 text-xs text-[#8B98B3]">Click an object to circle it.</p>
           </div>
         ) : (
           <p className="rounded-2xl bg-[#F4F7FB] p-4 text-sm text-[#5C6B8A]">No photo is attached, so there is no marker to show. You can still bill from the note.</p>
@@ -214,9 +215,12 @@ function EvidenceColumn({
             </li>
           ))}
           {invoice.lines.filter((line) => line.excluded).map((line) => (
-            <li key={line.id}>
-              <p className="font-semibold">{line.description} — {line.exclusionReason || "Excluded"}</p>
-              {line.transcriptQuote ? <p className="text-sm text-[#5C6B8A]">“{line.transcriptQuote}”</p> : null}
+            <li key={line.id} id={`${idPrefix}line-${line.id}`}>
+              <button type="button" className={`w-full rounded-2xl px-2 py-2 text-left ${focus?.lineId === line.id && line.photoRegion ? "bg-[#EEF3FF]" : "hover:bg-[#F7F9FC]"}`} onClick={() => line.photoRegion && onSelectLine(line.id)}>
+                <p className="font-semibold">{line.description} — {line.exclusionReason || "Excluded"}</p>
+                {line.photoRegion ? <p className="text-sm text-[#1258F5]">Show on photo</p> : null}
+                {line.transcriptQuote ? <p className="text-sm text-[#5C6B8A]">“{line.transcriptQuote}”</p> : null}
+              </button>
             </li>
           ))}
           {invoice.exclusions.length === 0 && invoice.lines.every((line) => !line.excluded) ? <li className="text-sm text-[#5C6B8A]">Nothing is excluded.</li> : null}
