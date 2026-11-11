@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeName } from "@/lib/domain/catalog";
 import { ServiceError } from "@/lib/domain/ids";
+import { emptyLedger } from "@/lib/domain/cashflow";
 import { defaultCatalog } from "@/lib/domain/sample";
 import type { BillingStore, StoredWorkspace } from "@/lib/paypal/service";
 import { createId } from "@/lib/domain/ids";
@@ -12,6 +13,8 @@ export function emptyWorkspace(id: string, ownerId: string, contractorName: stri
     ownerId,
     contractorName,
     currency: "USD",
+    timezone: "Australia/Perth",
+    cash: emptyLedger(new Date().toISOString().slice(0, 10)),
     customers: [],
     jobs: [],
     invoices: [],

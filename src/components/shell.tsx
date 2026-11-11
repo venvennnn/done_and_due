@@ -9,9 +9,10 @@ import { useWorkspace } from "./workspace-context";
 import { cn } from "@/lib/cn";
 
 const TABS = [
-  { href: "", label: "Overview" },
+  { href: "", label: "Cashflow" },
   { href: "/jobs", label: "Jobs" },
   { href: "/invoices", label: "Invoices" },
+  { href: "/customers", label: "Customers" },
   { href: "/price-list", label: "Price list" },
 ];
 
@@ -21,8 +22,8 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
   const base = workspace.mode === "demo" ? "/demo" : "/app";
   const badge = workspace.mode === "demo" ? "Demo · Simulated" : "PayPal Sandbox";
   return (
-    <div className="min-h-screen bg-[#E2E7EF] px-3 py-3 sm:px-5 sm:py-5">
-      <div className="mx-auto min-h-[calc(100vh-24px)] w-full max-w-[1440px] rounded-[28px] bg-[#F5F7FA] p-3 sm:p-5">
+    <div className="min-h-screen bg-white px-3 py-3 sm:px-5 sm:py-5">
+      <div className="mx-auto min-h-[calc(100vh-24px)] w-full max-w-[1440px] bg-white p-3 sm:p-5">
         <header className="rounded-[28px] bg-white px-3 py-3 shadow-[0_8px_30px_rgba(22,36,77,0.05)] sm:px-4">
           <div className="relative flex items-center justify-between gap-3">
             <Link href={base} aria-label="Done & Due overview">

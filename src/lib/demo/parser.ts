@@ -55,11 +55,25 @@ export function parseDemoTranscript(text: string): Extraction {
     });
   }
 
+  if (/consumable/i.test(source)) {
+    lines.push({
+      description: "Consumables",
+      catalogQuery: "consumables",
+      quantityDecimalOrNull: "1",
+      unitOrNull: "each",
+      ownership: "contractor",
+      transcriptQuoteOrNull: sentenceContaining(source, /consumable/i),
+      photoRegionOrNull: null,
+      reviewReasonOrNull: null,
+    });
+  }
+
   const hours = /(\d+(?:\.\d+)?)\s+hours?\s+of\s+(?:plumbing\s+)?labor/i.exec(source);
   const oneHour = /one hour of labor/i.test(source);
+  const statedLabor = /labor was \$/i.test(source);
   const laborMention = /\blabor\b/i.test(source);
   if (hours || oneHour || laborMention) {
-    const quantity = hours ? hours[1] : oneHour ? "1" : null;
+    const quantity = hours ? hours[1] : oneHour || statedLabor ? "1" : null;
     lines.push({
       description: "Plumbing labor",
       catalogQuery: "plumbing labor",

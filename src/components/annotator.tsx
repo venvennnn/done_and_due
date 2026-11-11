@@ -76,15 +76,23 @@ export function PhotoAnnotator({
           role="img"
           aria-label={regions.length ? `Job photo. Click an object to circle it. ${regions.map((line) => line.photoRegion?.label).join(", ")}.` : "Job photo"}
         >
+          <defs>
+            <marker id="arrowhead" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+              <path d="M0,0 L7,3 L0,6 Z" fill="#004ac6" />
+            </marker>
+          </defs>
           {regions.map((line) => {
             const region = line.photoRegion!;
             const rect = sourceRect(region.box2d, photo.width, photo.height);
             const ellipse = paddedEllipse(rect, 0.08);
             const active = line.id === activeLineId;
             const number = lineNumber(lines, line.id);
+            const cx = ellipse.x + ellipse.width / 2;
+            const cy = ellipse.y + ellipse.height / 2;
             return (
               <g key={line.id} className="cursor-pointer outline-none" style={{ outline: "none" }} onPointerDown={(event) => { event.stopPropagation(); onSelectLine?.(line.id); }} tabIndex={0} role="button" aria-label={`Circle ${region.label}`} aria-pressed={active} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelectLine?.(line.id); } }}>
-                <ellipse cx={ellipse.x + ellipse.width / 2} cy={ellipse.y + ellipse.height / 2} rx={ellipse.width / 2} ry={ellipse.height / 2} fill="transparent" stroke={active ? "#1258F5" : "transparent"} strokeWidth={active ? Math.max(photo.width, photo.height) / 140 : 0} />
+                <ellipse cx={cx} cy={cy} rx={ellipse.width / 2} ry={ellipse.height / 2} fill="transparent" stroke={active ? "#004ac6" : "transparent"} strokeWidth={active ? Math.max(photo.width, photo.height) / 140 : 24} />
+                {active ? <line x1={Math.max(12, ellipse.x - photo.width * 0.04)} y1={Math.max(12, ellipse.y - photo.height * 0.04)} x2={cx} y2={cy} stroke="#004ac6" strokeWidth={Math.max(photo.width, photo.height) / 220} markerEnd="url(#arrowhead)" /> : null}
                 <title>{`${number} ${region.label}`}</title>
               </g>
             );

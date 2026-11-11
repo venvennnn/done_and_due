@@ -1,7 +1,7 @@
 import type { CatalogItem } from "./types";
 
 export const SAMPLE_TRANSCRIPT =
-  "Replaced the kitchen tap with a standard mixer tap. One hour of labor. The customer supplied the connectors.";
+  "Replaced the kitchen tap with a standard mixer tap for $110. Labor was $120. Used $10 of consumables. The customer supplied the connectors.";
 
 export const SAMPLE_PHOTO = {
   id: "sample-kitchen-tap",
@@ -25,8 +25,8 @@ export const SAMPLE_OBJECTS = [
 ] as const;
 
 export const SAMPLE_CUSTOMER = {
-  name: "Emma Wilson",
-  demoEmail: "emma.wilson@example.com",
+  name: "Alex Morgan",
+  demoEmail: "alex.morgan@example.com",
 };
 
 export function normalizeTranscript(value: string): string {
@@ -45,6 +45,7 @@ export function defaultCatalog(): CatalogItem[] {
     item("cat_thermo", "Thermostatic mixer tap", "each", 9500, ["thermostatic mixer tap", "thermostatic tap"]),
     item("cat_boiler", "Boiler service", "each", 18000, ["boiler service", "boiler"]),
     item("cat_garden", "Garden tidy", "each", 8000, ["garden tidy", "garden tidy up"]),
+    item("cat_consumables", "Consumables", "each", 1000, ["consumables"]),
   ];
   function item(id: string, name: string, unit: string, rateMinor: number, aliases: string[]): CatalogItem {
     return { id, name, unit, rateMinor, aliases, active: true, retiredAt: now };

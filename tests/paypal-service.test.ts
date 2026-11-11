@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createSign, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { emptyLedger } from "@/lib/domain/cashflow";
 import { applyExtraction } from "@/lib/domain/extraction";
 import { ServiceError, assertNotDemoId } from "@/lib/domain/ids";
 import { patchLine } from "@/lib/domain/mutate";
@@ -11,7 +12,7 @@ import { defaultCatalog, SAMPLE_TRANSCRIPT } from "@/lib/domain/sample";
 import { crc32 } from "@/lib/paypal/crc32";
 import { MemoryBillingStore } from "@/lib/paypal/memory-store";
 import { observePayPalInvoice, type PayPalInvoice } from "@/lib/paypal/map";
-import { approveInvoice, createPayPalDraft, deliverPayPal, processWebhook, refreshPayPal, type StoredWorkspace } from "@/lib/paypal/service";
+import { approveInvoice, createPayPalDraft, deliverPayPal, processWebhook, refreshPayPal, remindPayPal, type StoredWorkspace } from "@/lib/paypal/service";
 import { verifyWebhookSignature } from "@/lib/paypal/verify";
 import type { PayPalClient } from "@/lib/paypal/client";
 import { draftFromTranscript } from "@/lib/demo/sample-draft";
@@ -26,6 +27,8 @@ function workspaceWith(invoice: Invoice, id = "ws_1"): StoredWorkspace {
     ownerId: "user_1",
     contractorName: "Alex",
     currency: "USD",
+    timezone: "UTC",
+    cash: emptyLedger("2026-11-11"),
     customers: [],
     jobs: [
       {
@@ -55,14 +58,14 @@ function draftInvoice(): Invoice {
   const drafted = draftFromTranscript({ text: SAMPLE_TRANSCRIPT, catalog: defaultCatalog(), transcript, photo: samplePhoto() });
   const labor = drafted.lines.find((line) => line.unit === "hr")!;
   const lines = drafted.lines.map((line) => (line.id === labor.id ? patchLine(line, { quantity: "1.5" }, defaultCatalog(), now.toISOString()) : line));
-  const total = 13000;
+  const total = 30000;
   return {
     id: "inv_130",
     jobId: "job_tap",
     number: "DD-1042",
     customerId: null,
     recipientName: "Sandbox Buyer",
-    recipientEmail: "buyer@sandbox.example",
+    recipientEmail: "buyer@personal.sandbox",
     currency: "USD",
     approval: "editing",
     delivery: "not_prepared",
@@ -129,6 +132,10 @@ function client(handlers: Partial<PayPalClient> & { createDraft?: PayPalClient["
     async deleteDraft(id) {
       calls.push(`delete:${id}`);
     },
+    async remind(id, _body, requestId) {
+      calls.push(`remind:${id}:${requestId}`);
+      if (handlers.remind) return handlers.remind(id, _body, requestId);
+    },
   };
 }
 
@@ -141,7 +148,7 @@ describe("PayPal reconciliation", () => {
     const drafted = await createPayPalDraft(store, paypal, "ws_1", "inv_130", now);
     expect(drafted.paypalInvoiceId).toBe("INV2-ONE");
     expect(drafted.delivery).toBe("provider_draft");
-    expect(drafted.snapshot?.totalMinor).toBe(13000);
+    expect(drafted.snapshot?.totalMinor).toBe(30000);
     await createPayPalDraft(store, paypal, "ws_1", "inv_130", now);
     expect(paypal.calls.filter((call) => call.startsWith("create:"))).toHaveLength(1);
 
@@ -291,6 +298,23 @@ describe("PayPal reconciliation", () => {
         authAlgo: "SHA256withRSA",
       }),
     ).toBe(false);
+  });
+
+  it("keeps delivery unchanged when PayPal rejects a reminder", async () => {
+    const store = new MemoryBillingStore();
+    const invoice = draftInvoice();
+    invoice.approval = "approved";
+    invoice.delivery = "sent";
+    invoice.deliveryMethod = "email";
+    invoice.paypalInvoiceId = "INV2-ONE";
+    store.seed(workspaceWith(invoice));
+    const paypal = client({
+      remind: async () => {
+        throw new ServiceError("paypal_http", 422, "PayPal rejected the reminder.", "bad_input");
+      },
+    });
+    await expect(remindPayPal(store, paypal, "ws_1", invoice.id, { subject: "Payment due", note: "Please pay." }, now)).rejects.toMatchObject({ code: "reminder_rejected" });
+    expect((await store.getWorkspace("ws_1"))?.invoices[0]?.delivery).toBe("sent");
   });
 });
 

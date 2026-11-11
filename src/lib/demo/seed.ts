@@ -1,3 +1,4 @@
+import { DEMO_FRIDAY, DEMO_REFERENCE_DATE, emptyLedger } from "@/lib/domain/cashflow";
 import { syncTotals } from "@/lib/domain/invoice-math";
 import { defaultCatalog, SAMPLE_CUSTOMER, SAMPLE_PHOTO, SAMPLE_TRANSCRIPT } from "@/lib/domain/sample";
 import type { CatalogItem, Customer, Invoice, InvoiceLine, Job, PaymentRecord, TimelineEvent, WorkspaceSnapshot } from "@/lib/domain/types";
@@ -8,6 +9,9 @@ export const DEMO_IDS = {
   daniel: "demo_cus_daniel",
   maya: "demo_cus_maya",
   alex: "demo_cus_alex",
+  jamie: "demo_cus_jamie",
+  jobJamie: "demo_job_jamie",
+  invJamie: "demo_inv_023",
   jobTap: "demo_job_tap",
   jobBoiler: "demo_job_boiler",
   jobGarden: "demo_job_garden",
@@ -104,8 +108,9 @@ export function buildSampleInvoice(now: Date, catalog: CatalogItem[]): Invoice {
   return syncTotals({
     id: DEMO_IDS.invTap,
     jobId: DEMO_IDS.jobTap,
-    number: "DD-1042",
-    customerId: DEMO_IDS.emma,
+    number: "INV-024",
+    customerId: DEMO_IDS.alex,
+    dueDate: DEMO_REFERENCE_DATE,
     recipientName: SAMPLE_CUSTOMER.name,
     recipientEmail: SAMPLE_CUSTOMER.demoEmail,
     currency: "USD",
@@ -137,17 +142,18 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
   const catalog = demoCatalog();
   const sample = buildSampleInvoice(now, catalog);
   const customers = [
-    customer(DEMO_IDS.emma, "Emma Wilson", SAMPLE_CUSTOMER.demoEmail, daysAgo(now, 40)),
+    customer(DEMO_IDS.emma, "Emma Wilson", "emma.wilson@example.com", daysAgo(now, 40)),
     customer(DEMO_IDS.daniel, "Daniel Lee", "daniel.lee@example.com", daysAgo(now, 30)),
     customer(DEMO_IDS.maya, "Maya Patel", "maya.patel@example.com", daysAgo(now, 20)),
-    customer(DEMO_IDS.alex, "Alex Morgan", "alex.morgan@example.com", daysAgo(now, 15)),
+    customer(DEMO_IDS.alex, "Alex Morgan", SAMPLE_CUSTOMER.demoEmail, daysAgo(now, 15)),
+    customer(DEMO_IDS.jamie, "Jamie Reed", "jamie.reed@example.com", daysAgo(now, 12)),
   ];
 
   const jobs: Job[] = [
     {
       id: DEMO_IDS.jobTap,
       title: "Kitchen tap replacement",
-      customerId: DEMO_IDS.emma,
+      customerId: DEMO_IDS.alex,
       photo: samplePhoto(),
       audio: null,
       transcript: { revisionId: "demo_rev_sample", text: SAMPLE_TRANSCRIPT, source: "sample", createdAt: now.toISOString() },
@@ -162,10 +168,25 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
     job(DEMO_IDS.jobBoilerPaid, "Annual boiler service", DEMO_IDS.daniel, daysAgo(now, 1, 16)),
     job(DEMO_IDS.jobGardenPaid, "Garden tidy", DEMO_IDS.maya, daysAgo(now, 2, 15)),
     job(DEMO_IDS.jobSeal, "Bathroom seal", DEMO_IDS.daniel, daysAgo(now, 6)),
+    job(DEMO_IDS.jobJamie, "Service call", DEMO_IDS.jamie, daysAgo(now, 4)),
   ];
 
   const invoices: Invoice[] = [
     sample,
+    issued({
+      id: DEMO_IDS.invJamie,
+      jobId: DEMO_IDS.jobJamie,
+      number: "INV-023",
+      customerId: DEMO_IDS.jamie,
+      name: "Jamie Reed",
+      email: "jamie.reed@example.com",
+      lines: [line({ id: "demo_line_jamie", description: "Service call", quantity: "1", unit: "each", rateMinor: 8000, catalogItemId: null })],
+      delivery: "sent",
+      settlement: "unpaid",
+      paid: 0,
+      at: daysAgo(now, 4),
+      dueDate: "2026-11-10",
+    }),
     draftInvoice(DEMO_IDS.invBoilerDraft, DEMO_IDS.jobBoiler, "DD-1041", DEMO_IDS.daniel, "Daniel Lee", "daniel.lee@example.com", [line({ id: "demo_line_boiler", description: "Boiler service", quantity: "1", unit: "each", rateMinor: 18000, catalogItemId: "demo_cat_boiler" })], daysAgo(now, 1, 8)),
     draftInvoice(DEMO_IDS.invGardenDraft, DEMO_IDS.jobGarden, "DD-1040", DEMO_IDS.maya, "Maya Patel", "maya.patel@example.com", [line({ id: "demo_line_garden_draft", description: "Garden tidy", quantity: "1", unit: "each", rateMinor: 8000, catalogItemId: "demo_cat_garden" })], daysAgo(now, 2, 8)),
     issued({
@@ -174,7 +195,7 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
       number: "DD-1038",
       customerId: DEMO_IDS.emma,
       name: "Emma Wilson",
-      email: SAMPLE_CUSTOMER.demoEmail,
+      email: "emma.wilson@example.com",
       lines: [line({ id: "demo_line_callout", description: "Call-out", quantity: "1", unit: "each", rateMinor: 10000, catalogItemId: null })],
       delivery: "sent",
       settlement: "unpaid",
@@ -187,7 +208,7 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
       number: "DD-1037",
       customerId: DEMO_IDS.alex,
       name: "Alex Morgan",
-      email: "alex.morgan@example.com",
+      email: SAMPLE_CUSTOMER.demoEmail,
       lines: [line({ id: "demo_line_radiator", description: "Radiator", quantity: "1", unit: "each", rateMinor: 20000, catalogItemId: null })],
       delivery: "sent",
       settlement: "unpaid",
@@ -252,8 +273,24 @@ export function createDemoSnapshot(now = new Date()): WorkspaceSnapshot {
 
   return {
     mode: "demo",
-    contractorName: "Alex",
+    contractorName: "Dave",
     currency: "USD",
+    timezone: "Australia/Perth",
+    cash: {
+      ...emptyLedger(DEMO_REFERENCE_DATE),
+      openingMinor: 31000,
+      bills: [
+        {
+          id: "demo_bill_reece",
+          payee: "Reece Plumbing",
+          amountMinor: 50000,
+          dueDate: DEMO_FRIDAY,
+          originalDueDate: DEMO_FRIDAY,
+          status: "committed",
+          includedInOpening: false,
+        },
+      ],
+    },
     customers,
     jobs,
     invoices,
@@ -331,6 +368,7 @@ function issued(input: {
   settlement: Invoice["settlement"];
   paid: number;
   at: string;
+  dueDate?: string;
 }): Invoice {
   const total = input.lines.reduce((sum, item) => sum + (item.rateMinor ?? 0) * Number(item.quantity ?? 0), 0);
   return syncTotals({
@@ -369,6 +407,7 @@ function issued(input: {
     paypalInvoiceId: null,
     paypalRecipientViewUrl: null,
     lastVerifiedAt: input.at,
+    dueDate: input.dueDate ?? null,
     seeded: true,
     simulated: true,
     sample: false,

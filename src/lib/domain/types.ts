@@ -22,7 +22,7 @@ export type Ownership = "contractor" | "customer" | "unknown";
 
 export type OperationStatus = "claimed" | "succeeded" | "failed_safe_to_retry" | "outcome_unknown";
 
-export type OperationType = "create_draft" | "send_email" | "create_share_link";
+export type OperationType = "create_draft" | "send_email" | "create_share_link" | "remind";
 
 export type EvidenceSource = "gemini" | "contractor" | "sample";
 
@@ -239,6 +239,7 @@ export type Invoice = {
   paypalInvoiceId: string | null;
   paypalRecipientViewUrl: string | null;
   lastVerifiedAt: string | null;
+  dueDate?: string | null;
   seeded: boolean;
   simulated: boolean;
   sample: boolean;
@@ -246,16 +247,50 @@ export type Invoice = {
   updatedAt: string;
 };
 
+export type BillStatus = "committed" | "cancelled" | "paid";
+
+export type OutgoingBill = {
+  id: string;
+  payee: string;
+  amountMinor: number;
+  dueDate: string;
+  originalDueDate: string;
+  status: BillStatus;
+  includedInOpening: boolean;
+};
+
+export type AvailabilitySource = "confirmed" | "estimated" | "unknown";
+
+export type CashReceipt = {
+  id: string;
+  invoiceId: string | null;
+  providerPaymentId: string | null;
+  amountMinor: number;
+  availableOn: string | null;
+  availability: AvailabilitySource;
+  label: string;
+  includedInOpening: boolean;
+};
+
+export type CashLedger = {
+  asOfDate: string;
+  openingMinor: number;
+  bills: OutgoingBill[];
+  receipts: CashReceipt[];
+};
+
 export type WorkspaceSnapshot = {
   mode: WorkspaceMode;
   contractorName: string;
   currency: string;
+  timezone: string;
   customers: Customer[];
   jobs: Job[];
   invoices: Invoice[];
   catalog: CatalogItem[];
   timeline: TimelineEvent[];
   payments: PaymentRecord[];
+  cash: CashLedger;
 };
 
 export type ExtractionLine = {

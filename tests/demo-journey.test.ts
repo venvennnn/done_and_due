@@ -9,17 +9,17 @@ describe("public demo journey", () => {
   it("runs capture edits, approval, simulated payment, reload, and reset", () => {
     let state = createDemoState(now);
     const seeded = state.snapshot.invoices.find((invoice) => invoice.id === DEMO_IDS.invTap)!;
-    expect(seeded.totalMinor).toBe(10000);
+    expect(seeded.totalMinor).toBe(24000);
     expect(seeded.exclusions.some((item) => /connector/i.test(item.description))).toBe(true);
-    expect(awaitingPayment(state.snapshot.invoices).reduce((sum, invoice) => sum + (invoice.amountDueMinor ?? 0), 0)).toBe(42000);
+    expect(awaitingPayment(state.snapshot.invoices).reduce((sum, invoice) => sum + (invoice.amountDueMinor ?? 0), 0)).toBe(50000);
 
     const labor = seeded.lines.find((line) => line.unit === "hr")!;
     state = updateInvoiceLine(state, seeded.id, labor.id, { quantity: "1.5" }, now);
     let invoice = state.snapshot.invoices.find((item) => item.id === seeded.id)!;
-    expect(invoice.lines.find((line) => line.unit === "hr")?.rateMinor).toBe(6000);
-    expect(invoice.totalMinor).toBe(13000);
+    expect(invoice.lines.find((line) => line.unit === "hr")?.rateMinor).toBe(12000);
+    expect(invoice.totalMinor).toBe(30000);
     invoice = structuredClone(state).snapshot.invoices.find((item) => item.id === seeded.id)!;
-    expect(invoice.totalMinor).toBe(13000);
+    expect(invoice.totalMinor).toBe(30000);
 
     const blockedDuration = loadDurationExample(createDemoState(now), now).state;
     const durationInvoice = blockedDuration.snapshot.invoices.find((item) => item.id === DEMO_IDS.invTap)!;
@@ -50,15 +50,15 @@ describe("public demo journey", () => {
     expect(invoice.delivery).toBe("sent");
     expect(invoice.settlement).toBe("paid");
     expect(invoice.amountDueMinor).toBe(0);
-    expect(invoice.snapshot?.totalMinor).toBe(13000);
+    expect(invoice.snapshot?.totalMinor).toBe(30000);
     expect(state.snapshot.timeline.filter((event) => event.invoiceId === invoice.id && event.simulated).length).toBeGreaterThanOrEqual(4);
     const paidBefore = paidInRange(createDemoState(now).snapshot.payments, DEFAULT_FILTER, now).reduce((sum, payment) => sum + payment.amountMinor, 0);
     const paidAfter = paidInRange(state.snapshot.payments, DEFAULT_FILTER, now).reduce((sum, payment) => sum + payment.amountMinor, 0);
-    expect(paidAfter).toBe(paidBefore + 13000);
+    expect(paidAfter).toBe(paidBefore + 30000);
     expect(invoice.delivery).toBe("sent");
 
     const reset = resetDemo(now);
-    expect(reset.snapshot.invoices.find((item) => item.id === DEMO_IDS.invTap)?.totalMinor).toBe(10000);
+    expect(reset.snapshot.invoices.find((item) => item.id === DEMO_IDS.invTap)?.totalMinor).toBe(24000);
     expect(reset.snapshot.mode).toBe("demo");
   });
 });

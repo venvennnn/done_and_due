@@ -55,14 +55,35 @@ npm run build
 
 ## Demo
 
-1. Open `/demo`.
-2. Choose **Load sample job** for Emma Wilson, the kitchen tap photo, and the sample transcript.
-3. Create the draft. The sample bills a mixer tap at $40 and one hour of plumbing at $60. Connectors, the plant, and the soap dispenser stay under Not billed. Click the plant, tap, or soap dispenser on the photo to circle that object.
-4. Change labor to 1.5 hours. The total becomes $130 and survives reload in this browser.
-5. Approve, simulate sending, open the demo buyer preview, then simulate pending, partial, and paid.
-6. **Reset demo** clears only the demo workspace.
+The public demo opens on Cashflow Pulse for the week of 11 November 2026. Opening cash is $310 as of that Wednesday. Reece Plumbing’s $500 bill is due Friday 13 November. Alex Morgan’s kitchen tap invoice INV-024 is $240 ($120 labor, $110 mixer tap, $10 consumables). Jamie Reed’s overdue service call INV-023 is $80.
 
-**Load missing-duration example** leaves labor unresolved so approval stays blocked. Renaming a line to "tap" abstains between the $40 and $95 mixer taps. An empty recipient email also blocks approval.
+1. Open `/demo`. The first screen shows **$190 short** on Friday and **Ask Alex to pay by Thursday**.
+2. Preview Jamie only, Alex only, both, and Alex arriving Monday. Friday closes at −$110, +$50, +$130, and −$190.
+3. Open Alex’s invoice, select the mixer tap, and confirm the transcript highlights “$110” while the photo circles the tap and points to it.
+4. Draft the simulated reminder, then open the labeled buyer page.
+5. Simulate payment. The invoice is paid and Friday’s baseline buffer is $50 under the labeled Thursday availability assumption.
+6. Start a second job from **New job**. Replaying Alex’s sample returns the existing INV-024 instead of a second copy.
+7. Reload keeps the demo. **Reset demo** returns the $190 Friday gap.
+
+**Load missing-duration example** leaves labor unresolved so approval stays blocked. Renaming a line to "tap" abstains between the catalog mixer taps. An empty recipient email also blocks approval.
+
+## Forecast
+
+Business dates are `YYYY-MM-DD` in the workspace timezone. The demo timezone is Australia/Perth and the labeled reference date is 2026-11-11. The opening balance is end of day on the as-of date. The forecast starts the next day.
+
+```
+cash_in(d)  = eligible receipts available on d
+cash_out(d) = committed outflows scheduled on d
+closing(d)  = opening + sum(cash_in(t) - cash_out(t)) through d
+shortfall(d) = max(0, -closing(d))
+buffer(d)    = max(0,  closing(d))
+```
+
+A scenario adds selected collectible amounts on their assumed dates and does not write those amounts into the ledger. Confirmed payment and funds available to spend stay separate. A paid invoice with no availability date stays out of the baseline and reads **Paid · availability unknown**.
+
+## Migrations
+
+Apply `supabase/migrations/001_init.sql`, then `002_cash_ledger.sql`. Cash figures are stored in `workspaces.state.cash`. The second migration adds a read-only `workspace_cash` view.
 
 Demo audio is local playback. Typed notes are the transcription path. Photos and recordings stay in IndexedDB when the browser supports it.
 
@@ -141,10 +162,14 @@ Ran on this workspace with provider credentials unset. Unit and contract tests u
 | --- | --- |
 | `npm run lint` | Passed |
 | `npm run typecheck` | Passed |
-| `npm test` | 16 passed. Pricing, extraction, geometry, catalog abstention, demo journey, PayPal create/retry/webhook/delivery. |
+| `npm test` | 21 passed. Forecast scenarios, demo journey, PayPal create/retry/webhook/reminder rejection. |
 | `npm run eval` | 24 fixture jobs. Clean case incorrect dollars 0. Missing-duration case stays unresolved. Gemini arms marked pilot pending. |
 | `npm run build` | Passed. `/api/health` returns `payments: sandbox-only`. |
-| Headless Chrome at 1440 and 390 | Demo home, overview, review, labor edit to 1.5 hours ($130) surviving reload, approve, simulate send, pending, partial, paid, reset back to $100, duration example blocked, PayPal setup screen with missing names and no simulate control. No requests left `127.0.0.1`. |
+| Automated unit tests | Passed. Friday scenarios, late availability, earlier shortfall, same-day timing, overdue bills, cumulative receipts, refunds, stale observations, reminder rejection, demo reset. |
+| Browser demo, credentials unset | Passed on desktop and 375px. $190 Friday gap, scenario matrix, tap circle with leader arrow, simulated reminder and buyer page, paid invoice with a $50 Friday buffer, reset back to $190. Requests stayed on 127.0.0.1. |
+| Real Gemini extraction | Pending. Needs `GEMINI_API_KEY`. Typed notes and manual lines still work. |
+| Sandbox invoice creation and buyer payment | Pending. Needs Sandbox REST credentials, a separate buyer account, and `PAYPAL_MERCHANT_WORKSPACE_ID`. No buyer payment was observed in this run. |
+| Verified webhook delivery | Pending. Needs the same Sandbox app and a public HTTPS URL for `/api/webhooks/paypal`. Manual refresh is the local substitute. |
 | Docker image | Not run. `docker` is not installed in this environment. |
 | Live PayPal buyer payment | Blocked. Needs sandbox merchant, buyer, and secrets. |
 | Live Gemini photo-and-voice | Blocked. Needs `GEMINI_API_KEY` and a fresh recording. |

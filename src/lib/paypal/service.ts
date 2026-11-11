@@ -1,7 +1,8 @@
 import { approvalBlockers, reviewFlags } from "@/lib/domain/invoice-math";
 import { createId, ServiceError } from "@/lib/domain/ids";
 import { buildTimeline, changeDelivery } from "@/lib/domain/mutate";
-import type { Invoice, OperationRecord, OperationType, TimelineEvent, WebhookReceipt } from "@/lib/domain/types";
+import { emptyLedger } from "@/lib/domain/cashflow";
+import type { CashLedger, Invoice, OperationRecord, OperationType, TimelineEvent, WebhookReceipt } from "@/lib/domain/types";
 import { buildPayPalInvoiceBody, idempotencyKey, observePayPalInvoice, type PayPalInvoice } from "./map";
 import type { PayPalClient } from "./client";
 
@@ -16,6 +17,8 @@ export type StoredWorkspace = {
   catalog: import("@/lib/domain/types").CatalogItem[];
   timeline: TimelineEvent[];
   payments: import("@/lib/domain/types").PaymentRecord[];
+  timezone: string;
+  cash: CashLedger;
   operations: OperationRecord[];
   webhooks: WebhookReceipt[];
   aiRuns: import("@/lib/domain/types").AiRun[];
@@ -148,7 +151,17 @@ function finish(workspace: StoredWorkspace, operationId: string, status: Operati
   Object.assign(operation, extra);
 }
 
+function rejectFixtureRecipient(email: string) {
+  const host = email.trim().toLowerCase().split("@")[1] ?? "";
+  if (!host || host === "example.com" || host === "example.org" || host === "example.net" || host.endsWith(".example")) {
+    throw new ServiceError("fixture_recipient", 400, "Enter the Sandbox buyer’s own email. A fixture address is never sent a PayPal invoice.", "bad_input");
+  }
+}
+
 export async function createPayPalDraft(store: BillingStore, paypal: PayPalClient, workspaceId: string, invoiceId: string, now = new Date()): Promise<Invoice> {
+  const existing = await store.getWorkspace(workspaceId);
+  const currentInvoice = existing?.invoices.find((item) => item.id === invoiceId);
+  if (currentInvoice) rejectFixtureRecipient(currentInvoice.recipientEmail);
   const claimed = await withClaim(store, workspaceId, invoiceId, "create_draft", now);
   if (claimed.replay && claimed.invoice.paypalInvoiceId) return claimed.invoice;
   if (claimed.invoice.paypalInvoiceId && claimed.replay) return claimed.invoice;
@@ -227,6 +240,7 @@ export async function deliverPayPal(
   const current = await store.getWorkspace(workspaceId);
   const invoice = current?.invoices.find((item) => item.id === invoiceId);
   if (!invoice?.paypalInvoiceId) throw new ServiceError("no_draft", 409, "Create the PayPal draft before sending it.");
+  rejectFixtureRecipient(invoice.recipientEmail);
   const claimed = await withClaim(store, workspaceId, invoiceId, type, now);
   if (claimed.replay) {
     const latest = await store.getWorkspace(workspaceId);
@@ -404,6 +418,44 @@ async function markWebhook(store: BillingStore, workspaceId: string, eventId: st
   });
 }
 
+export async function remindPayPal(
+  store: BillingStore,
+  paypal: PayPalClient,
+  workspaceId: string,
+  invoiceId: string,
+  note: { subject: string; note: string },
+  now = new Date(),
+): Promise<Invoice> {
+  const current = await store.getWorkspace(workspaceId);
+  const invoice = current?.invoices.find((item) => item.id === invoiceId);
+  if (!invoice?.paypalInvoiceId || (invoice.delivery !== "sent" && invoice.delivery !== "ready_to_share")) {
+    throw new ServiceError("not_sent", 409, "Send the PayPal invoice before reminding the buyer.");
+  }
+  try {
+    await paypal.remind(invoice.paypalInvoiceId, note, `dd-${invoice.snapshot?.id ?? invoice.id}-remind-${now.getTime()}`.slice(0, 108));
+  } catch (error) {
+    const serviceError = error instanceof ServiceError ? error : new ServiceError("paypal_http", 502, "PayPal did not send the reminder.", "uncertain");
+    if (serviceError.category === "bad_input" || serviceError.category === "permission") {
+      throw new ServiceError("reminder_rejected", serviceError.status, "PayPal did not send that reminder. The invoice is unchanged. Copy the note and share the payment link instead.", "bad_input");
+    }
+    throw serviceError;
+  }
+  return mutate(store, workspaceId, (workspace) => {
+    const saved = invoiceOf(workspace, invoiceId);
+    workspace.timeline.unshift(
+      buildTimeline({
+        invoice: saved,
+        message: "Reminder sent through PayPal",
+        kind: "reminder",
+        at: now.toISOString(),
+        actor: "contractor",
+        simulated: false,
+      }),
+    );
+    return clone(saved);
+  });
+}
+
 export function workspaceSnapshot(workspace: StoredWorkspace) {
   return {
     mode: "paypal_sandbox" as const,
@@ -415,5 +467,7 @@ export function workspaceSnapshot(workspace: StoredWorkspace) {
     catalog: workspace.catalog,
     timeline: workspace.timeline,
     payments: workspace.payments,
+    timezone: workspace.timezone,
+    cash: workspace.cash ?? emptyLedger(new Date().toISOString().slice(0, 10)),
   };
 }

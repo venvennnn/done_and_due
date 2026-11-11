@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ServiceError } from "@/lib/domain/ids";
 import { assertSameOrigin } from "@/lib/http/origin";
-import type { Box2D } from "@/lib/domain/types";
+import type { Box2D, CashLedger } from "@/lib/domain/types";
 import type { LinePatch } from "@/lib/domain/mutate";
 import {
   addCustomer,
@@ -15,6 +15,8 @@ import {
   newJob,
   paypalDraft,
   paypalRefresh,
+  paypalRemind,
+  saveCash,
   paypalSend,
   retireCatalog,
   saveCatalog,
@@ -91,6 +93,10 @@ async function dispatch(action: string, store: SupabaseBillingStore, workspaceId
       return paypalSend(store, workspaceId, text(body.invoiceId), "link");
     case "paypal-refresh":
       return paypalRefresh(store, workspaceId, text(body.invoiceId));
+    case "paypal-remind":
+      return paypalRemind(store, workspaceId, text(body.invoiceId), text(body.subject), text(body.note));
+    case "save-cash":
+      return saveCash(store, workspaceId, body.cash as CashLedger);
     case "add-customer":
       return addCustomer(store, workspaceId, { name: text(body.name), email: text(body.email) });
     case "save-catalog":
