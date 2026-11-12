@@ -1,3 +1,4 @@
+import { upsertReceipt } from "@/lib/domain/cashflow";
 import { approvalBlockers, reviewFlags } from "@/lib/domain/invoice-math";
 import { createId, ServiceError } from "@/lib/domain/ids";
 import {
@@ -59,6 +60,7 @@ export function resetDemo(now = new Date()): DemoState {
 }
 
 export function loadSampleJob(state: DemoState, now = new Date()): { state: DemoState; jobId: string } {
+  if (state.snapshot.jobs.some((job) => job.id === DEMO_IDS.jobTap)) return { state, jobId: DEMO_IDS.jobTap };
   const next = clone(state);
   const stamp = at(now);
   const catalog = next.snapshot.catalog;
@@ -73,7 +75,7 @@ export function loadSampleJob(state: DemoState, now = new Date()): { state: Demo
   const job: Job = {
     id: DEMO_IDS.jobTap,
     title: "Kitchen tap replacement",
-    customerId: DEMO_IDS.emma,
+    customerId: DEMO_IDS.alex,
     photo,
     audio: null,
     transcript,
@@ -86,8 +88,9 @@ export function loadSampleJob(state: DemoState, now = new Date()): { state: Demo
   const invoice: Invoice = {
     id: DEMO_IDS.invTap,
     jobId: job.id,
-    number: "DD-1042",
-    customerId: DEMO_IDS.emma,
+    number: "INV-024",
+    customerId: DEMO_IDS.alex,
+    dueDate: "2026-11-11",
     recipientName: SAMPLE_CUSTOMER.name,
     recipientEmail: SAMPLE_CUSTOMER.demoEmail,
     currency: "USD",
@@ -422,6 +425,17 @@ export function simulateSettlement(state: DemoState, invoiceId: string, target: 
         simulated: true,
         note: "Simulated payment in full",
       });
+      const assumption = invoice.number === "INV-024";
+      next.snapshot.cash.receipts = upsertReceipt(next.snapshot.cash.receipts, {
+        id: `demo_receipt_${invoiceId}`,
+        invoiceId,
+        providerPaymentId: `demo_payment_${invoiceId}`,
+        amountMinor: updated.amountPaidMinor,
+        availableOn: assumption ? "2026-11-12" : null,
+        availability: assumption ? "estimated" : "unknown",
+        label: assumption ? "Demo availability assumption" : "Simulated payment",
+        includedInOpening: false,
+      });
     }
   }
   next.snapshot = replaceInvoice(next.snapshot, updated);
@@ -430,6 +444,30 @@ export function simulateSettlement(state: DemoState, invoiceId: string, target: 
   next.snapshot.timeline.unshift(
     buildTimeline({ invoice: updated, message: label, kind: "payment", at: stamp, actor: "demo_simulation", simulated: true }),
   );
+  return next;
+}
+
+export function draftReminder(state: DemoState, invoiceId: string, note: string, now = new Date()): DemoState {
+  const next = clone(state);
+  const invoice = mustInvoice(next.snapshot, invoiceId);
+  next.snapshot.timeline.unshift(
+    buildTimeline({
+      invoice,
+      message: `Simulated reminder drafted. No email was sent. ${note}`.slice(0, 240),
+      kind: "reminder",
+      at: at(now),
+      actor: "demo_simulation",
+      simulated: true,
+    }),
+  );
+  return next;
+}
+
+export function replaceLedger(state: DemoState, cash: DemoState["snapshot"]["cash"]): DemoState {
+  if (!Number.isInteger(cash.openingMinor) || cash.openingMinor < 0) throw new ServiceError("bad_cash", 400, "Opening cash has to be zero or more, in cents.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(cash.asOfDate)) throw new ServiceError("bad_date", 400, "Use a business date as YYYY-MM-DD.");
+  const next = clone(state);
+  next.snapshot.cash = cash;
   return next;
 }
 

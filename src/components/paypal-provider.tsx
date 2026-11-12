@@ -93,6 +93,8 @@ export function PayPalProvider({ children, integration, contractorName }: { chil
       sendPayPal: async (invoiceId) => { await run("paypal-send", { invoiceId }); },
       linkPayPal: async (invoiceId) => { await run("paypal-link", { invoiceId }); },
       refreshPayPal: async (invoiceId) => { await run("paypal-refresh", { invoiceId }); },
+      remind: async (invoiceId, subject, note) => { await run("paypal-remind", { invoiceId, subject, note }); },
+      saveCash: async (cash) => { await run("save-cash", { cash }); },
       addCustomer: async (input) => String((await run("add-customer", input)).id),
       saveCatalog: async (input) => { await run("save-catalog", input); },
       retireCatalog: async (id) => { await run("retire-catalog", { id }); },

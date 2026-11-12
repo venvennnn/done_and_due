@@ -10,6 +10,7 @@ export type PayPalClient = {
   getInvoice(id: string): Promise<PayPalInvoice>;
   searchByNumber(invoiceNumber: string): Promise<PayPalInvoice[]>;
   deleteDraft(id: string): Promise<void>;
+  remind(id: string, body: { subject: string; note: string }, requestId: string): Promise<void>;
 };
 
 export function classifyHttpStatus(status: number): ProviderErrorCategory {
@@ -100,6 +101,14 @@ export function createPayPalClient(env: NodeJS.ProcessEnv = process.env, fetchIm
     },
     async deleteDraft(id) {
       await request("DELETE", `/v2/invoicing/invoices/${encodeURIComponent(id)}`);
+    },
+    async remind(id, body, requestId) {
+      await request(
+        "POST",
+        `/v2/invoicing/invoices/${encodeURIComponent(id)}/remind`,
+        { subject: body.subject, note: body.note, send_to_invoicer: false },
+        requestId,
+      );
     },
   };
 }

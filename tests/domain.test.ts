@@ -82,14 +82,16 @@ describe("sample draft", () => {
     const drafted = draftFromTranscript({ text: SAMPLE_TRANSCRIPT, catalog, transcript, photo: samplePhoto(), idPrefix: "sample" });
     const tap = drafted.lines.find((line) => line.unit === "each");
     const labor = drafted.lines.find((line) => line.unit === "hr");
-    expect(tap?.rateMinor).toBe(4000);
+    expect(tap?.rateMinor).toBe(11000);
     expect(tap?.quantity).toBe("1");
+    expect(tap?.transcriptQuote).toContain("$110");
     expect(tap?.photoRegion?.box2d).toEqual([100, 430, 780, 810]);
-    expect(labor?.rateMinor).toBe(6000);
+    expect(labor?.rateMinor).toBe(12000);
+    expect(drafted.lines.find((line) => line.description === "Consumables")?.rateMinor).toBe(1000);
     expect(labor?.photoRegion).toBeNull();
     expect(drafted.lines.filter((line) => line.photoRegion).map((line) => line.photoRegion?.label)).toEqual(["Standard mixer tap", "Potted herb", "Soap dispenser"]);
     expect(drafted.lines.filter((line) => line.description === "Potted herb" || line.description === "Soap dispenser").every((line) => line.excluded)).toBe(true);
-    expect(labor?.transcriptQuote?.toLowerCase()).toContain("one hour of labor");
+    expect(labor?.transcriptQuote?.toLowerCase()).toContain("labor was $120");
     expect(drafted.exclusions[0]?.description.toLowerCase()).toContain("connector");
     const flags = reviewFlags({
       invoice: {

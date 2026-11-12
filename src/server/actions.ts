@@ -9,7 +9,9 @@ import { isSampleTranscript, SAMPLE_PHOTO, SAMPLE_TRANSCRIPT } from "@/lib/domai
 import type { Extraction, Invoice, Job, JobPhoto } from "@/lib/domain/types";
 import { extractWithGemini, transcribeWithGemini } from "@/lib/gemini/client";
 import { createPayPalClient, type PayPalClient } from "@/lib/paypal/client";
-import { approveInvoice, createPayPalDraft, deliverPayPal, refreshPayPal, workspaceSnapshot, type BillingStore, type StoredWorkspace } from "@/lib/paypal/service";
+import { assertLedger } from "@/lib/domain/cashflow";
+import type { CashLedger } from "@/lib/domain/types";
+import { approveInvoice, createPayPalDraft, deliverPayPal, refreshPayPal, remindPayPal, workspaceSnapshot, type BillingStore, type StoredWorkspace } from "@/lib/paypal/service";
 import { draftFromTranscript } from "@/lib/demo/sample-draft";
 import { samplePhoto } from "@/lib/demo/seed";
 import { normalizeJobImage } from "@/server/image";
@@ -91,7 +93,7 @@ export async function loadSample(store: BillingStore, workspaceId: string, durat
         jobId: id,
         number: nextNumber(workspace),
         customerId: null,
-        recipientName: "Emma Wilson (sample)",
+        recipientName: "Alex Morgan (sample)",
         recipientEmail: "",
         currency: workspace.currency,
         approval: "editing",
@@ -211,7 +213,7 @@ export async function createDraft(store: BillingStore, workspaceId: string, jobI
         jobId,
         number: existing?.number ?? nextNumber(workspace),
         customerId: job.customerId,
-        recipientName: customer?.name ?? existing?.recipientName ?? (job.sample ? "Emma Wilson (sample)" : ""),
+        recipientName: customer?.name ?? existing?.recipientName ?? (job.sample ? "Alex Morgan (sample)" : ""),
         recipientEmail: customer?.email ?? existing?.recipientEmail ?? "",
         currency: workspace.currency,
         approval: "editing",
@@ -338,6 +340,28 @@ export async function paypalSend(store: BillingStore, workspaceId: string, invoi
   await deliverPayPal(store, paypalOrThrow(), workspaceId, invoiceId, method);
   const workspace = await store.getWorkspace(workspaceId);
   return { snapshot: workspace ? workspaceSnapshot(workspace) : null };
+}
+
+export async function paypalRemind(store: BillingStore, workspaceId: string, invoiceId: string, subject: string, note: string) {
+  guardId(invoiceId);
+  assertBound(workspaceId);
+  if (!subject.trim() || !note.trim()) throw new ServiceError("bad_reminder", 400, "Add a subject and a note before sending a reminder.");
+  await remindPayPal(store, paypalOrThrow(), workspaceId, invoiceId, { subject: subject.trim(), note: note.trim() });
+  const workspace = await store.getWorkspace(workspaceId);
+  return { snapshot: workspace ? workspaceSnapshot(workspace) : null };
+}
+
+export async function saveCash(store: BillingStore, workspaceId: string, cash: CashLedger) {
+  try {
+    assertLedger(cash);
+  } catch (error) {
+    throw new ServiceError("bad_cash", 400, error instanceof Error ? error.message : "Check the cash figures.");
+  }
+  const workspace = await store.getWorkspace(workspaceId);
+  if (!workspace) throw new ServiceError("missing_workspace", 404, "Workspace not found.");
+  workspace.cash = cash;
+  await store.saveWorkspace(workspace);
+  return { snapshot: workspaceSnapshot(workspace) };
 }
 
 export async function paypalRefresh(store: BillingStore, workspaceId: string, invoiceId: string) {

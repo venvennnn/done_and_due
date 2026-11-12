@@ -6,6 +6,7 @@ import { formatMoney, formatWhen, relativeDay, statusLabel } from "@/lib/format"
 import { lineTotal } from "@/lib/domain/invoice-math";
 import { amountDue, customerById } from "@/lib/domain/overview";
 import { parseMoneyToMinor } from "@/lib/domain/money";
+import { PhotoAnnotator } from "./annotator";
 import { Button, Card, Field, inputClass, Pill } from "./ui";
 import { Stepper } from "./shell";
 import { useWorkspace } from "./workspace-context";
@@ -155,8 +156,13 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
   const workspace = useWorkspace();
   const base = workspace.mode === "demo" ? "/demo" : "/app";
   const invoice = workspace.snapshot?.invoices.find((item) => item.id === invoiceId);
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
   if (!invoice || !workspace.snapshot) return <Card><p>That invoice is not in this workspace.</p></Card>;
   const events = workspace.snapshot.timeline.filter((event) => event.invoiceId === invoice.id);
+  const job = workspace.snapshot.jobs.find((item) => item.id === invoice.jobId);
+  const selectedLineId = activeLineId ?? invoice.lines.find((line) => line.photoRegion && !line.excluded)?.id ?? null;
+  const active = invoice.lines.find((line) => line.id === selectedLineId);
+  const quote = active?.transcriptSpan;
   const link = workspace.mode === "demo" && (invoice.delivery === "sent" || invoice.delivery === "ready_to_share") ? `${base}/invoices/${invoice.id}/buyer` : invoice.paypalRecipientViewUrl;
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
@@ -172,10 +178,26 @@ export function InvoiceDetailScreen({ invoiceId }: { invoiceId: string }) {
         <p className="mt-1 text-sm text-[#5C6B8A]">Amount due {invoice.amountDueMinor === null ? "unknown" : formatMoney(amountDue(invoice), invoice.currency)} · Paid {formatMoney(invoice.amountPaidMinor, invoice.currency)}</p>
         <p className="mt-1 text-sm text-[#5C6B8A]">Last verified {formatWhen(invoice.lastVerifiedAt)}</p>
         <ul className="mt-4 space-y-2 text-sm">
-          {invoice.lines.filter((line) => !line.excluded).map((line) => <li key={line.id} className="flex justify-between"><span>{line.description}</span><span>{line.quantity} × {line.rateMinor === null ? "—" : formatMoney(line.rateMinor, invoice.currency)}</span></li>)}
+          {invoice.lines.filter((line) => !line.excluded).map((line) => (
+            <li key={line.id}>
+              <button type="button" className="flex w-full justify-between rounded-xl px-2 py-2 text-left hover:bg-[#F4F7FB]" aria-pressed={selectedLineId === line.id} onClick={() => setActiveLineId(line.id)}>
+                <span>{line.description}</span>
+                <span>{line.quantity} × {line.rateMinor === null ? "—" : formatMoney(line.rateMinor, invoice.currency)}</span>
+              </button>
+            </li>
+          ))}
         </ul>
+        {job?.photo?.url ? <PhotoAnnotator photo={job.photo} lines={invoice.lines} activeLineId={selectedLineId} onSelectLine={setActiveLineId} /> : null}
+        {job?.transcript?.text ? (
+          <p className="mt-3 text-sm leading-6">
+            {quote && !quote.ambiguous ? <>{job.transcript.text.slice(0, quote.start)}<mark className="rounded bg-[#DCE7FF] px-1">{job.transcript.text.slice(quote.start, quote.end)}</mark>{job.transcript.text.slice(quote.end)}</> : job.transcript.text}
+          </p>
+        ) : null}
+        <p className="mt-3"><Link className="font-semibold text-[#004ac6]" href={`${base}/jobs/${invoice.jobId}/review`}>Review evidence</Link></p>
         {link ? <p className="mt-4 break-all text-sm"><span className="font-semibold">Share link · </span>{link}</p> : <p className="mt-4 text-sm text-[#5C6B8A]">No share link yet.</p>}
         {workspace.mode === "paypal_sandbox" && invoice.paypalInvoiceId ? <Button className="mt-4" variant="ghost" onClick={() => workspace.actions.refreshPayPal(invoice.id)}>Refresh from PayPal</Button> : null}
+        <ReminderForm invoiceId={invoice.id} demo={workspace.mode === "demo"} onRemind={workspace.actions.remind} />
+        <AvailabilityNote invoiceId={invoice.id} />
       </Card>
       <Card>
         <h2 className="font-extrabold">Payment timeline</h2>
@@ -263,6 +285,37 @@ export function PriceListScreen() {
           }}>Save item</Button>
         </div>
       </Card>
+    </div>
+  );
+}
+
+function ReminderForm({ invoiceId, demo, onRemind }: { invoiceId: string; demo: boolean; onRemind: (invoiceId: string, subject: string, note: string) => Promise<void> }) {
+  const [subject, setSubject] = useState("Payment due");
+  const [note, setNote] = useState("Please pay the invoice when you can. The share link is the payment page.");
+  const [open, setOpen] = useState(false);
+  const [result, setResult] = useState("");
+  if (!open) return <Button className="mt-4" variant="ghost" onClick={() => setOpen(true)}>{demo ? "Draft a simulated reminder" : "Remind through PayPal"}</Button>;
+  return (
+    <form className="mt-4 space-y-2" onSubmit={(event) => { event.preventDefault(); void onRemind(invoiceId, subject, note).then(() => setResult(demo ? "Simulated reminder drafted. No email was sent." : "Sent")).catch((error: unknown) => setResult(error instanceof Error ? error.message : "PayPal did not send the reminder. Copy the note instead.")); }}>
+      <label className="block text-sm font-semibold">Subject<input className={inputClass} value={subject} onChange={(event) => setSubject(event.target.value)} /></label>
+      <label className="block text-sm font-semibold">Note<textarea className={inputClass} value={note} onChange={(event) => setNote(event.target.value)} /></label>
+      <Button type="submit">{demo ? "Save simulated reminder" : "Send reminder"}</Button>
+      {result ? <p className="text-sm">{result}</p> : null}
+      {result && !demo && result !== "Sent" ? <button type="button" className="text-sm font-semibold underline" onClick={() => void navigator.clipboard.writeText(`${subject}\n${note}`)}>Copy note</button> : null}
+    </form>
+  );
+}
+
+function AvailabilityNote({ invoiceId }: { invoiceId: string }) {
+  const workspace = useWorkspace();
+  const receipt = workspace.snapshot?.cash.receipts.find((item) => item.invoiceId === invoiceId);
+  const invoice = workspace.snapshot?.invoices.find((item) => item.id === invoiceId);
+  if (!invoice || invoice.amountPaidMinor <= 0) return null;
+  return (
+    <div className="mt-4 rounded-2xl bg-[#f3f4f5] p-3 text-sm">
+      <p className="font-semibold">Payment received {formatMoney(invoice.amountPaidMinor, invoice.currency)}</p>
+      <p>{receipt ? `${receipt.availability} · ${receipt.availableOn ?? "availability unknown"} · ${receipt.label}` : "Paid · availability unknown"}</p>
+      <Link className="font-semibold text-[#004ac6] underline" href={workspace.mode === "demo" ? "/demo" : "/app"}>Back to the forecast</Link>
     </div>
   );
 }

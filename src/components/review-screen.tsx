@@ -178,7 +178,7 @@ function EvidenceColumn({
 }) {
   const workspace = useWorkspace();
   const job = workspace.snapshot?.jobs.find((item) => item.id === invoice.jobId);
-  const quote = focus?.kind === "transcript" ? invoice.lines.find((line) => line.id === focus.lineId)?.transcriptSpan : null;
+  const quote = focus ? invoice.lines.find((line) => line.id === focus.lineId)?.transcriptSpan ?? null : null;
   return (
     <>
       <Card>
@@ -188,7 +188,7 @@ function EvidenceColumn({
         </div>
         {job?.photo?.url ? (
           <div id={`${idPrefix}evidence-photo`}>
-            <PhotoAnnotator photo={job.photo} lines={invoice.lines} activeLineId={focus?.kind === "photo" ? focus.lineId : null} placingLineId={placing} onSelectLine={onSelectLine} onPlace={onPlace} />
+            <PhotoAnnotator photo={job.photo} lines={invoice.lines} activeLineId={focus?.lineId ?? null} placingLineId={placing} onSelectLine={onSelectLine} onPlace={onPlace} />
             <p className="mt-2 text-xs text-[#8B98B3]">Click an object to circle it.</p>
           </div>
         ) : (

@@ -1,6 +1,6 @@
 import { applyExtraction } from "@/lib/domain/extraction";
 import { syncTotals } from "@/lib/domain/invoice-math";
-import { SAMPLE_OBJECTS, SAMPLE_PHOTO } from "@/lib/domain/sample";
+import { isSampleTranscript, SAMPLE_OBJECTS, SAMPLE_PHOTO } from "@/lib/domain/sample";
 import type { CatalogItem, Invoice, InvoiceLine, JobPhoto, MatchDecision, Transcript } from "@/lib/domain/types";
 import { parseDemoTranscript } from "./parser";
 
@@ -78,9 +78,28 @@ export function draftFromTranscript(input: {
     regionSource: "sample",
     idPrefix: input.idPrefix,
   });
-  const lines =
+  const marked =
     input.photo?.id === SAMPLE_PHOTO.id ? attachSampleMarker(applied.lines, input.photo) : applied.lines.map((line) => ({ ...line, photoRegion: null }));
-  return { ...applied, lines };
+  return { ...applied, lines: groundSamplePrices(marked, input.text) };
+}
+
+function groundSamplePrices(lines: InvoiceLine[], text: string): InvoiceLine[] {
+  if (!isSampleTranscript(text)) return lines;
+  return lines.map((line) => {
+    if (/mixer tap|kitchen tap/i.test(line.description)) return priced(line, 11000, "Replaced the kitchen tap with a standard mixer tap for $110.");
+    if (line.unit === "hr") return priced(line, 12000, "Labor was $120.");
+    if (/consumable/i.test(line.description)) return priced(line, 1000, "Used $10 of consumables.");
+    return line;
+  });
+}
+
+function priced(line: InvoiceLine, rateMinor: number, quote: string): InvoiceLine {
+  return {
+    ...line,
+    rateMinor,
+    transcriptQuote: quote,
+    provenance: { ...line.provenance, rate: "transcript" },
+  };
 }
 
 export function withTotals<T extends Invoice>(invoice: T): T {
